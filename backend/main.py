@@ -110,5 +110,31 @@ def get_similar_books(title: str = Query(..., description="Book title to find si
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error finding similar books: {str(e)}")
 
+@app.get("/books/popular")
+def get_popular_books(
+    rating_category: str | None = Query(None, description="Rating category filter, e.g. 'very_high', 'high', 'medium'"),
+    language: str | None = Query(None, description="ISO language code filter, e.g. 'eng'") ,
+    min_ratings: int = Query(1000, ge=0, description="Minimum ratings count to consider a book popular"),
+    limit: int = Query(10, gt=0, description="Number of books to return")
+):
+    """Fetch popular books based on rating category, language, and popularity criteria."""
+    try:
+        recommender = get_recommender()
+        popular_books = recommender.engine.get_popular_books_by_category(
+            rating_category=rating_category,
+            language=language,
+            min_ratings=min_ratings,
+            n_books=limit,
+        )
+        return {
+            "rating_category": rating_category,
+            "language": language,
+            "min_ratings": min_ratings,
+            "books": popular_books,
+            "count": len(popular_books),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching popular books: {str(e)}")
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

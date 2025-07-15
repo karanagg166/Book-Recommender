@@ -1,107 +1,101 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, Star, Users, Crown, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Mock data for popular books since we don't have the endpoint yet
-const mockPopularBooks = [
-  {
-    title: "Harry Potter and the Sorcerer's Stone",
-    author: "J.K. Rowling",
-    rating: 4.47,
-    ratingsCount: 8234567,
-    category: "Fantasy",
-    year: 1997
-  },
-  {
-    title: "To Kill a Mockingbird", 
-    author: "Harper Lee",
-    rating: 4.25,
-    ratingsCount: 5234567,
-    category: "Classic",
-    year: 1960
-  },
-  {
-    title: "The Great Gatsby",
-    author: "F. Scott Fitzgerald", 
-    rating: 3.93,
-    ratingsCount: 4567890,
-    category: "Classic",
-    year: 1925
-  },
-  {
-    title: "1984",
-    author: "George Orwell",
-    rating: 4.19,
-    ratingsCount: 3456789,
-    category: "Dystopian",
-    year: 1949
-  },
-  {
-    title: "Pride and Prejudice",
-    author: "Jane Austen",
-    rating: 4.27,
-    ratingsCount: 3234567,
-    category: "Romance", 
-    year: 1813
-  },
-  {
-    title: "The Catcher in the Rye",
-    author: "J.D. Salinger",
-    rating: 3.80,
-    ratingsCount: 2876543,
-    category: "Classic",
-    year: 1951
-  }
-];
-
+/**
+ * Book object returned by /books/popular endpoint.
+ * `year` is computed client-side from publication date if provided;
+ * if unavailable, books are sorted without the "recent" criterion.
+ */
 interface Book {
   title: string;
   author: string;
   rating: number;
   ratingsCount: number;
-  category: string;
-  year: number;
+  language?: string; // used as a surrogate category filter
+  year?: number;     // optional – not guaranteed by API
 }
 
+/**
+ * API base is read from env to avoid hard-coding – falls back to localhost for dev.
+ */
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+
 export default function PopularBooks() {
-  const [books] = useState<Book[]>(mockPopularBooks);
-  const [filteredBooks, setFilteredBooks] = useState<Book[]>(mockPopularBooks);
+  const [books, setBooks] = useState<Book[]>([]);
+  const [filteredBooks, setFilteredBooks] = useState<Book[]>([]);
   const [sortBy, setSortBy] = useState<'rating' | 'popularity' | 'recent'>('popularity');
-  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterLanguage, setFilterLanguage] = useState<string>('all');
 
-  const categories = ['all', ...Array.from(new Set(books.map(book => book.category.toLowerCase())))];
-
+  /**
+   * Fetch popular books once on mount. The backend already returns
+   * books sorted by rating – front-end re-sorts as needed.
+   */
   useEffect(() => {
-    filterAndSortBooks();
-  }, [sortBy, filterCategory, books]);
+    const fetchPopularBooks = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/books/popular?limit=50&min_ratings=1000`);
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const data = await res.json();
 
-  const filterAndSortBooks = () => {
-    let filtered = books;
+        // Normalise keys for UI
+        const hydrated: Book[] = (data.books || []).map((b: any) => ({
+          title: b.title,
+          author: b.author,
+          rating: b.rating,
+          ratingsCount: b.ratings_count,
+          language: b.language,
+          year: (b.publication_year as number | undefined) ?? undefined,
+        }));
 
-    // Apply category filter
-    if (filterCategory !== 'all') {
-      filtered = books.filter(book => 
-        book.category.toLowerCase() === filterCategory.toLowerCase()
-      );
+        setBooks(hydrated);
+        setFilteredBooks(hydrated);
+      } catch (err) {
+        console.error('Error loading popular books', err);
+        toast.error('Failed to load popular books');
+      }
+    };
+
+    fetchPopularBooks();
+  }, []);
+
+  /**
+   * Compute language list from current books (memoised for perf).
+   */
+  const languages = useMemo(() => {
+    const langs = new Set<string>();
+    books.forEach((b) => b.language && langs.add(b.language.toLowerCase()));
+    return ['all', ...Array.from(langs)];
+  }, [books]);
+
+  /**
+   * Whenever sort or language filter changes, recompute view list.
+   */
+  useEffect(() => {
+    if (!books.length) return;
+
+    let view = books;
+
+    if (filterLanguage !== 'all') {
+      view = view.filter((b) => (b.language || 'unknown').toLowerCase() === filterLanguage);
     }
 
-    // Apply sorting
-    const sorted = [...filtered].sort((a, b) => {
+    view = [...view].sort((a, b) => {
       switch (sortBy) {
         case 'rating':
           return b.rating - a.rating;
         case 'popularity':
           return b.ratingsCount - a.ratingsCount;
         case 'recent':
-          return b.year - a.year;
+          return (b.year ?? 0) - (a.year ?? 0);
         default:
           return 0;
       }
     });
 
-    setFilteredBooks(sorted);
-  };
+    setFilteredBooks(view);
+  }, [books, sortBy, filterLanguage]);
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) {
@@ -144,15 +138,29 @@ export default function PopularBooks() {
     return stars;
   };
 
-  const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = {
-      'fantasy': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-      'classic': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-      'romance': 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
-      'dystopian': 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
-      'mystery': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+  const getLanguageColor = (lang: string) => {
+    // Simple deterministic colour palette based on first letter for variety
+    const letter = lang[0]?.toLowerCase() || 'x';
+    const palette: Record<string, string> = {
+      a: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+      b: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+      c: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
+      d: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+      e: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+      f: 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-300',
+      g: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+      h: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+      i: 'bg-lime-100 text-lime-700 dark:bg-lime-900/30 dark:text-lime-300',
+      j: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+      k: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
+      l: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+      m: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+      n: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
+      o: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+      p: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+      default: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
     };
-    return colors[category.toLowerCase()] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+    return palette[letter] || palette.default;
   };
 
   return (
@@ -212,13 +220,13 @@ export default function PopularBooks() {
               Category
             </label>
             <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
+              value={filterLanguage}
+              onChange={(e) => setFilterLanguage(e.target.value)}
               className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
             >
-              {categories.map(category => (
-                <option key={category} value={category}>
-                  {category === 'all' ? 'All Categories' : category.charAt(0).toUpperCase() + category.slice(1)}
+              {languages.map(lang => (
+                <option key={lang} value={lang}>
+                  {lang === 'all' ? 'All Languages' : lang.toUpperCase()}
                 </option>
               ))}
             </select>
@@ -229,7 +237,7 @@ export default function PopularBooks() {
         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Showing {filteredBooks.length} books
-            {filterCategory !== 'all' && ` in ${filterCategory}`}
+            {filterLanguage !== 'all' && ` in ${filterLanguage}`}
             {sortBy === 'popularity' && ' sorted by popularity'}
             {sortBy === 'rating' && ' sorted by rating'}
             {sortBy === 'recent' && ' sorted by publication year'}
@@ -262,8 +270,8 @@ export default function PopularBooks() {
                 {i < 3 && <Crown className="w-5 h-5 text-yellow-500" />}
               </div>
               
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(book.category)}`}>
-                {book.category}
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getLanguageColor(book.language || 'unknown')}`}>
+                {(book.language || 'unk').toUpperCase()}
               </span>
             </div>
 
@@ -337,7 +345,7 @@ export default function PopularBooks() {
         <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-6 text-white">
           <Crown className="w-8 h-8 mb-3" />
           <h3 className="text-2xl font-bold mb-1">
-            {Math.max(...filteredBooks.map(book => book.year))}
+            {Math.max(...filteredBooks.map(book => book.year ?? 0))}
           </h3>
           <p className="opacity-90">Latest Publication</p>
         </div>
