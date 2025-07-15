@@ -29,12 +29,26 @@ class SentimentAnalyzer:
         try:
             nltk.data.find('tokenizers/punkt')
         except LookupError:
-            nltk.download('punkt', quiet=True)
+            try:
+                nltk.download('punkt', quiet=True)
+            except:
+                pass
+        
+        try:
+            nltk.data.find('tokenizers/punkt_tab')
+        except LookupError:
+            try:
+                nltk.download('punkt_tab', quiet=True)
+            except:
+                pass
         
         try:
             nltk.data.find('corpora/stopwords')
         except LookupError:
-            nltk.download('stopwords', quiet=True)
+            try:
+                nltk.download('stopwords', quiet=True)
+            except:
+                pass
     
     def _clean_text(self, text: str) -> str:
         """Clean and preprocess text."""
@@ -184,10 +198,17 @@ class SentimentAnalyzer:
         # Clean text data
         training_data['clean_text'] = training_data[text_column].apply(self._clean_text)
         
-        # Create vectorizer
-        stop_words = stopwords.words('english')
+        # Create vectorizer with fallback tokenizer
+        try:
+            stop_words = stopwords.words('english')
+            tokenizer = word_tokenize
+        except:
+            # Fallback if NLTK is not working
+            stop_words = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']
+            tokenizer = lambda x: x.split()  # Simple whitespace tokenizer
+        
         self.vectorizer = CountVectorizer(
-            tokenizer=word_tokenize,
+            tokenizer=tokenizer,
             stop_words=stop_words,
             ngram_range=(1, 2),
             max_features=5000
@@ -273,29 +294,38 @@ class SentimentAnalyzer:
     
     def get_sentiment_score(self, text: str) -> float:
         """Get sentiment score (0-1, where 1 is most positive)."""
-        if self.model is None or self.vectorizer is None:
-            if not self.load_model():
-                raise ValueError("Model not loaded and couldn't train new model")
-        
-        # Clean and vectorize text
-        clean_text = self._clean_text(text)
-        text_vec = self.vectorizer.transform([clean_text])
-        
-        # Get probability of positive sentiment
-        probabilities = self.model.predict_proba(text_vec)[0]
-        
-        # Return probability of positive class
-        # Assuming classes are ['negative', 'positive'] in alphabetical order
-        if len(probabilities) == 2:
-            positive_prob = probabilities[1]  # Second class (positive)
-        else:
-            positive_prob = 0.5  # Default if something goes wrong
-        
-        return positive_prob
+        try:
+            if self.model is None or self.vectorizer is None:
+                if not self.load_model():
+                    return 0.5  # Return neutral score if model fails to load
+            
+            # Clean and vectorize text
+            clean_text = self._clean_text(text)
+            text_vec = self.vectorizer.transform([clean_text])
+            
+            # Get probability of positive sentiment
+            probabilities = self.model.predict_proba(text_vec)[0]
+            
+            # Return probability of positive class
+            # Assuming classes are ['negative', 'positive'] in alphabetical order
+            if len(probabilities) == 2:
+                positive_prob = probabilities[1]  # Second class (positive)
+            else:
+                positive_prob = 0.5  # Default if something goes wrong
+            
+            return positive_prob
+        except Exception as e:
+            print(f"Error in sentiment analysis for text: {e}")
+            return 0.5  # Return neutral score on error
     
     def batch_sentiment_scores(self, texts: List[str]) -> List[float]:
         """Get sentiment scores for multiple texts."""
-        return [self.get_sentiment_score(text) for text in texts]
+        try:
+            return [self.get_sentiment_score(text) for text in texts]
+        except Exception as e:
+            print(f"Error in batch sentiment analysis: {e}")
+            # Return neutral scores (0.5) if sentiment analysis fails
+            return [0.5] * len(texts)
 
 
 def create_sentiment_analyzer() -> SentimentAnalyzer:

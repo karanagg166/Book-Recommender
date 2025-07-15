@@ -9,6 +9,7 @@ import os
 from data_loader import BookDataLoader
 from feature_engineering import BookFeatureEngineering
 from sentiment_analysis import SentimentAnalyzer
+from simple_sentiment import SimpleSentimentAnalyzer
 
 
 class BookRecommendationEngine:
@@ -18,7 +19,13 @@ class BookRecommendationEngine:
         self.model_path = model_path
         self.data_loader = BookDataLoader()
         self.feature_engineer = BookFeatureEngineering()
-        self.sentiment_analyzer = SentimentAnalyzer()
+        
+        # Try to use advanced sentiment analyzer, fallback to simple one
+        try:
+            self.sentiment_analyzer = SentimentAnalyzer()
+        except Exception as e:
+            print(f"Failed to load advanced sentiment analyzer, using simple fallback: {e}")
+            self.sentiment_analyzer = SimpleSentimentAnalyzer()
         
         # Model components
         self.knn_model: Optional[NearestNeighbors] = None
@@ -44,9 +51,13 @@ class BookRecommendationEngine:
         
         # Add sentiment scores
         print("Computing sentiment scores...")
-        self.books_data['sentiment_score'] = (
-            self.sentiment_analyzer.batch_sentiment_scores(sample_reviews)
-        )
+        try:
+            self.books_data['sentiment_score'] = (
+                self.sentiment_analyzer.batch_sentiment_scores(sample_reviews)
+            )
+        except Exception as e:
+            print(f"Error computing sentiment scores, using neutral values: {e}")
+            self.books_data['sentiment_score'] = [0.5] * len(self.books_data)
         
         # Engineer features
         print("Engineering features...")
@@ -154,57 +165,96 @@ class BookRecommendationEngine:
                 return True
             else:
                 print("No saved model found. Training new model...")
-                self.prepare_data()
-                self.train_model()
-                self.save_model()
+                self._initialize_new_model()
                 return True
         except Exception as e:
             print(f"Error loading model: {e}")
-            return False
+            print("Falling back to training new model...")
+            try:
+                self._initialize_new_model()
+                return True
+            except Exception as train_error:
+                print(f"Error training new model: {train_error}")
+                return False
+    
+    def _initialize_new_model(self):
+        """Initialize and train a new model."""
+        try:
+            self.prepare_data()
+            self.train_model()
+            self.save_model()
+            print("New model trained and saved successfully!")
+        except Exception as e:
+            print(f"Error during model initialization: {e}")
+            # Fall back to basic functionality without advanced features
+            self._initialize_basic_model()
+    
+    def _initialize_basic_model(self):
+        """Initialize basic model without advanced features."""
+        print("Initializing basic model...")
+        self.books_data = self.data_loader.load_data()
+        self.books_data = self.data_loader.preprocess_data()
+        
+        # Create simple features
+        simple_features = self.books_data[['average_rating', 'ratings_count']].fillna(0)
+        self.features_matrix = self.feature_engineer.scaler.fit_transform(simple_features)
+        self.feature_names = ['average_rating', 'ratings_count']
+        
+        # Train simple KNN model
+        self.knn_model = NearestNeighbors(n_neighbors=6, algorithm='ball_tree', metric='euclidean')
+        self.knn_model.fit(self.features_matrix)
+        
+        print("Basic model initialized successfully!")
     
     def get_book_recommendations_by_title(self, book_title: str, 
                                         n_recommendations: int = 5) -> List[Dict]:
         """Get recommendations based on a specific book title."""
-        if self.knn_model is None:
-            raise ValueError("Model not trained. Call train_model() first.")
-        
-        # Find the book
-        book_matches = self.books_data[
-            self.books_data['title'].str.lower().str.contains(
-                book_title.lower(), na=False
-            )
-        ]
-        
-        if book_matches.empty:
-            return [{"error": f"Book '{book_title}' not found"}]
-        
-        # Use the first match
-        book_idx = book_matches.index[0]
-        book_features = self.features_matrix[book_idx].reshape(1, -1)
-        
-        # Get similar books
-        distances, indices = self.knn_model.kneighbors(
-            book_features, n_neighbors=n_recommendations + 1
-        )
-        
-        recommendations = []
-        for i, (dist, idx) in enumerate(zip(distances[0], indices[0])):
-            if idx == book_idx:  # Skip the input book itself
-                continue
-                
-            book = self.books_data.iloc[idx]
-            similarity = 1 - dist  # Convert distance to similarity
+        try:
+            if self.knn_model is None or self.books_data is None:
+                return [{"error": "Recommendation model not available"}]
             
-            if similarity >= self.min_similarity_threshold:
+            # Find the book
+            book_matches = self.books_data[
+                self.books_data['title'].str.lower().str.contains(
+                    book_title.lower(), na=False
+                )
+            ]
+            
+            if book_matches.empty:
+                return [{"error": f"Book '{book_title}' not found"}]
+            
+            # Use the first match
+            book_idx = book_matches.index[0]
+            book_features = self.features_matrix[book_idx].reshape(1, -1)
+            
+            # Get similar books
+            distances, indices = self.knn_model.kneighbors(
+                book_features, n_neighbors=min(n_recommendations + 1, len(self.books_data))
+            )
+            
+            recommendations = []
+            for i, (dist, idx) in enumerate(zip(distances[0], indices[0])):
+                if idx == book_idx:  # Skip the input book itself
+                    continue
+                    
+                book = self.books_data.iloc[idx]
+                similarity = 1 - dist  # Convert distance to similarity
+                
                 recommendations.append({
                     'title': book['title'],
-                    'author': book['primary_author'],
+                    'author': book.get('primary_author', book.get('authors', 'Unknown')),
                     'rating': book['average_rating'],
                     'similarity': round(similarity, 3),
                     'ratings_count': book['ratings_count']
                 })
-        
-        return recommendations[:n_recommendations]
+                
+                if len(recommendations) >= n_recommendations:
+                    break
+            
+            return recommendations
+        except Exception as e:
+            print(f"Error getting book recommendations: {e}")
+            return [{"error": "Error generating recommendations"}]
     
     def get_recommendations_by_features(self, target_features: Dict[str, float],
                                       n_recommendations: int = 5) -> List[Dict]:

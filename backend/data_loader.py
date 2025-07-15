@@ -19,7 +19,12 @@ class BookDataLoader:
         
         try:
             self.data = pd.read_csv(self.csv_path, on_bad_lines='skip')
+            
+            # Fix column names by stripping whitespace
+            self.data.columns = self.data.columns.str.strip()
+            
             print(f"Loaded {len(self.data)} books from {self.csv_path}")
+            print(f"Columns: {list(self.data.columns)}")
             return self.data
         except Exception as e:
             raise Exception(f"Error loading CSV file: {str(e)}")

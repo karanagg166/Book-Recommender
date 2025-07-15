@@ -70,18 +70,32 @@ class BookFeatureEngineering:
         """Create features based on book content."""
         content_features = pd.DataFrame()
         
+        # Ensure num_pages column exists and handle missing values
+        if 'num_pages' not in data.columns:
+            print("Warning: num_pages column not found, using default values")
+            data['num_pages'] = 300  # Default page count
+        
+        # Fill missing page counts
+        data['num_pages'] = data['num_pages'].fillna(data['num_pages'].median())
+        
         # Page count features
         content_features['num_pages_normalized'] = np.log1p(data['num_pages'])
         
         # Page length categories
         page_bins = [0, 200, 400, 600, float('inf')]
         page_labels = ['short', 'medium', 'long', 'very_long']
-        data['page_category'] = pd.cut(
-            data['num_pages'], 
-            bins=page_bins, 
-            labels=page_labels,
-            include_lowest=True
-        )
+        
+        try:
+            data['page_category'] = pd.cut(
+                data['num_pages'], 
+                bins=page_bins, 
+                labels=page_labels,
+                include_lowest=True
+            )
+        except Exception as e:
+            print(f"Error creating page categories: {e}")
+            # Fallback: create default categories
+            data['page_category'] = 'medium'
         
         # One-hot encode page categories
         for category in page_labels:
