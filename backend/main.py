@@ -136,5 +136,91 @@ def get_popular_books(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching popular books: {str(e)}")
 
+@app.get("/analytics")
+def get_analytics():
+    """Return high-level collection statistics used by the frontend analytics dashboard."""
+    try:
+        recommender = get_recommender()
+        df = recommender.engine.books_data  # pandas DataFrame
+
+        if df is None or df.empty:
+            raise ValueError("Books data not available. Try rebuilding the model.")
+
+        import numpy as np
+        import pandas as pd
+
+        # Basic counts
+        total_books: int = int(len(df))
+        total_authors: int = int(df['primary_author'].nunique())
+        avg_rating: float = float(df['average_rating'].mean()) if 'average_rating' in df else 0.0
+        total_ratings: int = int(df['ratings_count'].sum()) if 'ratings_count' in df else 0
+
+        # ---------- Genre distribution ----------
+        # For performance, classify using simple keyword matching once.
+        genre_counts: dict[str, int] = {g: 0 for g in recommender.genre_keywords}
+
+        lower_titles = df['title'].str.lower().fillna("")
+        lower_authors = df['authors'].str.lower().fillna("") if 'authors' in df else pd.Series("")
+
+        import re
+        for genre, keywords in recommender.genre_keywords.items():
+            # Safely escape each keyword to avoid regex metacharacters interfering
+            pattern = '|'.join(re.escape(k) for k in keywords)
+            mask = lower_titles.str.contains(pattern, regex=True) | lower_authors.str.contains(pattern, regex=True)
+            genre_counts[genre] = int(mask.sum())
+
+        # Convert to list sorted by count desc
+        genre_distribution = [
+            {
+                "name": g.replace('_', ' ').title(),
+                "count": c,
+                "percentage": round(c / total_books * 100, 1) if total_books else 0.0,
+            }
+            for g, c in sorted(genre_counts.items(), key=lambda x: x[1], reverse=True) if c > 0
+        ]
+
+        # ---------- Language distribution ----------
+        top_lang_series = df['language_code'].fillna('unk').str.lower()
+        lang_counts = top_lang_series.value_counts()
+        top_languages = []
+        for lang, cnt in lang_counts.head(5).items():
+            top_languages.append({
+                "language": lang,
+                "count": int(cnt),
+                "percentage": round(cnt / total_books * 100, 1) if total_books else 0.0,
+            })
+
+        # ---------- Rating distribution ----------
+        bins = [0, 3.0, 3.5, 4.0, 4.5, 5.0]
+        labels = [
+            "Below 3.0",
+            "3.0-3.5",
+            "3.5-4.0",
+            "4.0-4.5",
+            "4.5-5.0",
+        ]
+        df['rating_bin'] = pd.cut(df['average_rating'], bins=bins, labels=labels, include_lowest=True, right=False)
+        rating_counts = df['rating_bin'].value_counts().reindex(labels, fill_value=0)
+        rating_distribution = [
+            {
+                "range": rng,
+                "count": int(cnt),
+                "percentage": round(cnt / total_books * 100, 1) if total_books else 0.0,
+            }
+            for rng, cnt in rating_counts.items()
+        ]
+
+        return {
+            "total_books": total_books,
+            "total_authors": total_authors,
+            "avg_rating": round(avg_rating, 2),
+            "total_ratings": total_ratings,
+            "genre_distribution": genre_distribution,
+            "top_languages": top_languages,
+            "rating_distribution": rating_distribution,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error computing analytics: {str(e)}")
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,40 +1,57 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart3, BookOpen, Users, Star, TrendingUp, Globe, Award } from 'lucide-react';
+import { toast } from 'sonner';
 
-// Mock analytics data
-const mockAnalytics = {
-  totalBooks: 11123,
-  totalAuthors: 4567,
-  avgRating: 4.02,
-  totalRatings: 34567890,
-  genreDistribution: [
-    { name: 'Fantasy', count: 2234, percentage: 20.1 },
-    { name: 'Romance', count: 1987, percentage: 17.9 },
-    { name: 'Mystery', count: 1654, percentage: 14.9 },
-    { name: 'Science Fiction', count: 1432, percentage: 12.9 },
-    { name: 'Biography', count: 1123, percentage: 10.1 },
-    { name: 'Other', count: 2693, percentage: 24.1 }
-  ],
-  topLanguages: [
-    { language: 'English', count: 9876, percentage: 88.8 },
-    { language: 'Spanish', count: 567, percentage: 5.1 },
-    { language: 'French', count: 234, percentage: 2.1 },
-    { language: 'German', count: 189, percentage: 1.7 },
-    { language: 'Other', count: 257, percentage: 2.3 }
-  ],
-  ratingDistribution: [
-    { range: '4.5-5.0', count: 3456, percentage: 31.1 },
-    { range: '4.0-4.5', count: 4123, percentage: 37.1 },
-    { range: '3.5-4.0', count: 2234, percentage: 20.1 },
-    { range: '3.0-3.5', count: 890, percentage: 8.0 },
-    { range: 'Below 3.0', count: 420, percentage: 3.7 }
-  ]
-};
+/**
+ * Data shape returned by /analytics endpoint.
+ */
+interface AnalyticsData {
+  total_books: number;
+  total_authors: number;
+  avg_rating: number;
+  total_ratings: number;
+  genre_distribution: { name: string; count: number; percentage: number }[];
+  top_languages: { language: string; count: number; percentage: number }[];
+  rating_distribution: { range: string; count: number; percentage: number }[];
+}
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
 
 export default function Analytics() {
-  const [data] = useState(mockAnalytics);
+  const [data, setData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState<'overview' | 'genres' | 'languages' | 'ratings'>('overview');
+
+  // Fetch analytics on mount
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/analytics`);
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const json = await res.json();
+        setData(json as AnalyticsData);
+      } catch (err) {
+        console.error('Failed loading analytics', err);
+        toast.error('Failed to load analytics');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAnalytics();
+  }, []);
+
+  const placeholder: AnalyticsData = {
+    total_books: 0,
+    total_authors: 0,
+    avg_rating: 0,
+    total_ratings: 0,
+    genre_distribution: [],
+    top_languages: [],
+    rating_distribution: [],
+  };
+
+  const analytics = data ?? placeholder;
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) {
@@ -120,28 +137,28 @@ export default function Analytics() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Books"
-          value={formatNumber(data.totalBooks)}
+          value={formatNumber(analytics.total_books)}
           icon={BookOpen}
           color="from-blue-500 to-cyan-500"
           subtitle="Available in catalog"
         />
         <StatCard
           title="Authors"
-          value={formatNumber(data.totalAuthors)}
+          value={formatNumber(analytics.total_authors)}
           icon={Users}
           color="from-green-500 to-emerald-500"
           subtitle="Unique writers"
         />
         <StatCard
           title="Average Rating"
-          value={data.avgRating.toFixed(2)}
+          value={analytics.avg_rating.toFixed(2)}
           icon={Star}
           color="from-yellow-500 to-orange-500"
           subtitle="Out of 5.0"
         />
         <StatCard
           title="Total Ratings"
-          value={formatNumber(data.totalRatings)}
+          value={formatNumber(analytics.total_ratings)}
           icon={TrendingUp}
           color="from-purple-500 to-pink-500"
           subtitle="Community reviews"
@@ -208,7 +225,7 @@ export default function Analytics() {
                   Quality Collection
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {((data.ratingDistribution[0].count + data.ratingDistribution[1].count) / data.totalBooks * 100).toFixed(1)}% 
+                  {analytics.rating_distribution.length >= 2 ? ((analytics.rating_distribution[4]?.count ?? 0 + analytics.rating_distribution[3]?.count ?? 0) / (analytics.total_books || 1) * 100).toFixed(1) : '0.0'}% 
                   of books rated 4.0+ stars
                 </p>
               </div>
@@ -219,7 +236,7 @@ export default function Analytics() {
                   Global Reach
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {data.topLanguages.length} languages represented in our collection
+                  {analytics.top_languages.length} languages represented in our collection
                 </p>
               </div>
 
@@ -229,7 +246,7 @@ export default function Analytics() {
                   Diverse Genres
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {data.genreDistribution.length} major genres covering all interests
+                  {analytics.genre_distribution.length} major genres covering all interests
                 </p>
               </div>
             </div>
@@ -238,7 +255,7 @@ export default function Analytics() {
 
         {selectedTab === 'genres' && (
           <DistributionChart
-            data={data.genreDistribution}
+            data={analytics.genre_distribution}
             title="Books by Genre"
             colorClass="bg-gradient-to-r from-purple-500 to-pink-500"
           />
@@ -246,7 +263,7 @@ export default function Analytics() {
 
         {selectedTab === 'languages' && (
           <DistributionChart
-            data={data.topLanguages}
+            data={analytics.top_languages}
             title="Books by Language"
             colorClass="bg-gradient-to-r from-blue-500 to-cyan-500"
           />
@@ -254,7 +271,7 @@ export default function Analytics() {
 
         {selectedTab === 'ratings' && (
           <DistributionChart
-            data={data.ratingDistribution}
+            data={analytics.rating_distribution}
             title="Books by Rating Range"
             colorClass="bg-gradient-to-r from-yellow-500 to-orange-500"
           />
@@ -272,9 +289,9 @@ export default function Analytics() {
           <TrendingUp className="w-8 h-8 mb-4" />
           <h3 className="text-xl font-bold mb-2">Most Popular Genre</h3>
           <p className="text-lg">
-            {data.genreDistribution[0].name} 
+            {analytics.genre_distribution[0]?.name ?? 'N/A'} 
             <span className="text-sm opacity-90 ml-2">
-              ({data.genreDistribution[0].percentage}% of collection)
+              ({analytics.genre_distribution[0]?.percentage ?? 0}% of collection)
             </span>
           </p>
         </div>
@@ -283,7 +300,7 @@ export default function Analytics() {
           <Star className="w-8 h-8 mb-4" />
           <h3 className="text-xl font-bold mb-2">Quality Rating</h3>
           <p className="text-lg">
-            {((data.ratingDistribution[0].count + data.ratingDistribution[1].count) / data.totalBooks * 100).toFixed(1)}% 
+            {analytics.rating_distribution.length >= 2 ? ((analytics.rating_distribution[4]?.count ?? 0 + analytics.rating_distribution[3]?.count ?? 0) / (analytics.total_books || 1) * 100).toFixed(1) : '0.0'}% 
             <span className="text-sm opacity-90 ml-2">
               books rated 4.0+ stars
             </span>
