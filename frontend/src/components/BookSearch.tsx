@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, BookOpen, Star, Users, Heart, Sparkles } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
+// Centralised API base; falls back to localhost during dev
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+
 interface Book {
   title: string;
   author: string;
@@ -54,7 +57,7 @@ export default function BookSearch() {
     setLoading(true);
     setHasSearched(true);
     try {
-      const res = await fetch(`http://localhost:8000/search?q=${encodeURIComponent(debouncedQuery)}`);
+      const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(debouncedQuery)}`);
       const data = await res.json();
       setResults(data.books || []);
     } catch (error) {
@@ -71,7 +74,7 @@ export default function BookSearch() {
     setSelectedBookTitle(bookTitle);
     setShowSimilarBooks(true);
     try {
-      const res = await fetch(`http://localhost:8000/books/similar?title=${encodeURIComponent(bookTitle)}&limit=6`);
+      const res = await fetch(`${API_BASE}/books/similar?title=${encodeURIComponent(bookTitle)}&limit=6`);
       const data = await res.json();
       setSimilarBooks(data.similar_books || []);
       if (data.similar_books && data.similar_books.length > 0) {

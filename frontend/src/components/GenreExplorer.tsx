@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, BookOpen, Star, Info, Users, Heart } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+
 interface GenreInfo {
   genre: string;
   total_books: number;
@@ -39,7 +41,7 @@ export default function GenreExplorer() {
 
   const fetchGenres = async () => {
     try {
-      const res = await fetch('http://localhost:8000/genres');
+      const res = await fetch(`${API_BASE}/genres`);
       const data = await res.json();
       setGenres(data.genres || []);
     } catch (error) {
@@ -51,7 +53,7 @@ export default function GenreExplorer() {
   const fetchGenreInfo = async (genre: string) => {
     setInfoLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/genre/${genre}/info`);
+      const res = await fetch(`${API_BASE}/genre/${genre}/info`);
       const data = await res.json();
       setGenreInfo(data);
     } catch (error) {
@@ -65,7 +67,7 @@ export default function GenreExplorer() {
   const fetchRecommendations = async (genre: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/recommend?genre=${genre}`);
+      const res = await fetch(`${API_BASE}/recommend?genre=${genre}`);
       const data = await res.json();
       setRecommendations(data.recommendations || []);
     } catch (error) {
@@ -82,7 +84,7 @@ export default function GenreExplorer() {
     setSelectedBookTitle(bookTitle);
     setShowSimilarBooks(true);
     try {
-      const res = await fetch(`http://localhost:8000/books/similar?title=${encodeURIComponent(bookTitle)}&limit=6`);
+      const res = await fetch(`${API_BASE}/books/similar?title=${encodeURIComponent(bookTitle)}&limit=6`);
       const data = await res.json();
       setSimilarBooks(data.similar_books || []);
       if (data.similar_books && data.similar_books.length > 0) {
