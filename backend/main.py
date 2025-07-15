@@ -19,6 +19,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Initialize the recommender system at startup."""
+    print("🚀 Starting Book Recommender API...")
+    print("📚 Initializing recommendation system...")
+    
+    # Initialize the recommender singleton at startup
+    recommender = get_recommender()
+    print(f"✅ Recommender initialized with {len(recommender.engine.books_data) if recommender.engine.books_data is not None else 0} books")
+    print("🎯 API ready to serve recommendations!")
+
 @app.get("/")
 def root():
     """Root endpoint with API information."""

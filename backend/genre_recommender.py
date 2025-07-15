@@ -67,6 +67,8 @@ class GenreBasedRecommender:
             self.engine.load_model()
             self._is_initialized = True
             print("Recommender ready!")
+        else:
+            print("Recommender already initialized, skipping...")
     
     def _classify_genre(self, book_title: str, book_author: str = "") -> List[str]:
         """Classify a book into genres based on title and author."""

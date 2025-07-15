@@ -121,15 +121,16 @@ class BookRecommendationEngine:
         
         return reviews
     
-    def train_model(self, algorithm: str = 'ball_tree'):
+    def train_model(self, algorithm: str = 'auto'):
         """Train the KNN model for recommendations."""
         if self.features_matrix is None:
             raise ValueError("Data not prepared. Call prepare_data() first.")
         
         print(f"Training KNN model with {self.n_neighbors} neighbors...")
+        # Use brute force for cosine similarity as it's the most reliable
         self.knn_model = NearestNeighbors(
             n_neighbors=min(self.n_neighbors, len(self.books_data)),
-            algorithm=algorithm,
+            algorithm='brute',  # brute force works with all metrics including cosine
             metric='cosine'
         )
         
@@ -152,7 +153,9 @@ class BookRecommendationEngine:
     def load_model(self) -> bool:
         """Load a pre-trained model."""
         try:
+            print(f"🔍 Looking for saved model at: {self.model_path}")
             if os.path.exists(self.model_path):
+                print("📁 Found saved model, loading...")
                 model_data = joblib.load(self.model_path)
                 
                 self.knn_model = model_data['knn_model']
@@ -161,37 +164,41 @@ class BookRecommendationEngine:
                 self.feature_names = model_data['feature_names']
                 self.feature_engineer = model_data['feature_engineer']
                 
-                print("Model loaded successfully!")
+                print("✅ Model loaded successfully!")
                 return True
             else:
-                print("No saved model found. Training new model...")
+                print("❌ No saved model found. Training new model...")
                 self._initialize_new_model()
                 return True
         except Exception as e:
-            print(f"Error loading model: {e}")
-            print("Falling back to training new model...")
+            print(f"⚠️  Error loading model: {e}")
+            print("🔄 Falling back to training new model...")
             try:
                 self._initialize_new_model()
                 return True
             except Exception as train_error:
-                print(f"Error training new model: {train_error}")
+                print(f"❌ Error training new model: {train_error}")
                 return False
     
     def _initialize_new_model(self):
         """Initialize and train a new model."""
         try:
+            print("🔧 Preparing data for advanced model...")
             self.prepare_data()
+            print("🎯 Training KNN model...")
             self.train_model()
+            print("💾 Saving model...")
             self.save_model()
-            print("New model trained and saved successfully!")
+            print("✅ New advanced model trained and saved successfully!")
         except Exception as e:
-            print(f"Error during model initialization: {e}")
+            print(f"❌ Error during advanced model initialization: {e}")
+            print("🔄 Falling back to basic model...")
             # Fall back to basic functionality without advanced features
             self._initialize_basic_model()
     
     def _initialize_basic_model(self):
         """Initialize basic model without advanced features."""
-        print("Initializing basic model...")
+        print("🔨 Initializing basic model...")
         self.books_data = self.data_loader.load_data()
         self.books_data = self.data_loader.preprocess_data()
         
@@ -248,13 +255,14 @@ class BookRecommendationEngine:
         # Fill any remaining NaN values
         features_df = features_df.fillna(0)
         
-        print(f"Created {len(feature_names)} features: {feature_names}")
+        print(f"📊 Created {len(feature_names)} features: {feature_names}")
         
         # Store features
         self.features_matrix = features_df.values
         self.feature_names = feature_names
         
         # Train KNN model with cosine similarity for better content matching
+        print("🎯 Training basic KNN model with cosine similarity...")
         self.knn_model = NearestNeighbors(
             n_neighbors=min(6, len(self.books_data)), 
             algorithm='brute',  # Use brute force for cosine with small datasets
@@ -262,7 +270,14 @@ class BookRecommendationEngine:
         )
         self.knn_model.fit(self.features_matrix)
         
-        print("Basic model initialized successfully with improved features!")
+        print("✅ Basic model initialized successfully with improved features!")
+        
+        # Save the basic model so we don't need to retrain every time
+        try:
+            self.save_model()
+            print("💾 Basic model saved successfully!")
+        except Exception as e:
+            print(f"⚠️  Warning: Could not save basic model: {e}")
     
     def get_book_recommendations_by_title(self, book_title: str, 
                                         n_recommendations: int = 5) -> List[Dict]:
