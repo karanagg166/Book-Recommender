@@ -30,6 +30,43 @@ class GenreBasedRecommender:
                 'mystery', 'detective', 'crime', 'murder', 'investigation',
                 'suspect', 'clue', 'police', 'thriller', 'suspense', 'noir'
             ],
+            # Expanded genres -------------------------------
+            'thriller': [
+                'thriller', 'suspense', 'psychological', 'serial killer', 'espionage',
+                'conspiracy', 'chase', 'hostage', 'terror', 'edge of your seat'
+            ],
+            'dystopian': [
+                'dystopian', 'post-apocalyptic', 'totalitarian', 'surveillance', 'future society',
+                'oppression', 'rebellion', 'collapse', 'ruins', 'orwellian'
+            ],
+            'historical_fiction': [
+                'historical fiction', 'period', 'victorian', 'regency', 'ancient', 'medieval',
+                'renaissance', 'wartime', 'civil war', 'colonial', 'era'
+            ],
+            'young_adult': [
+                'ya', 'young adult', 'teen', 'coming of age', 'high school', 'first love',
+                'identity', 'friendship', 'growth', 'journey'
+            ],
+            'classic': [
+                'classic', 'literature', 'masterpiece', 'timeless', 'canonical',
+                'great american novel', '19th century', '20th century', 'novel of manners'
+            ],
+            'poetry': [
+                'poetry', 'poem', 'verse', 'sonnet', 'haiku', 'collection', 'anthology',
+                'lyric', 'spoken word', 'stanza'
+            ],
+            'children': [
+                'children', 'kids', 'picture book', 'storybook', 'bedtime', 'nursery',
+                'middle grade', 'chapter book', 'adventure for kids'
+            ],
+            'drama': [
+                'drama', 'play', 'theatre', 'tragedy', 'stage', 'script', 'dialogue',
+                'character study', 'emotional', 'conflict'
+            ],
+            'comics': [
+                'comic', 'graphic novel', 'manga', 'illustrated', 'superhero', 'cartoon',
+                'panel', 'comic strip', 'dc', 'marvel'
+            ],
             'science_fiction': [
                 'science', 'fiction', 'space', 'future', 'robot', 'alien',
                 'galaxy', 'planet', 'time', 'travel', 'cyberpunk', 'dystopian'
