@@ -285,18 +285,27 @@ class BookRecommendationEngine:
             if self.knn_model is None or self.books_data is None:
                 return [{"error": "Recommendation model not available"}]
             
-            # Find the book
-            book_matches = self.books_data[
-                self.books_data['title'].str.lower().str.contains(
-                    book_title.lower(), na=False
-                )
-            ]
+            # 1) Exact case-insensitive match
+            exact_matches = self.books_data[self.books_data['title'].str.lower() == book_title.lower()]
+            if not exact_matches.empty:
+                book_idx = exact_matches.index[0]
+            else:
+                # 2) Safe substring contains (regex=False prevents special-char issues)
+                contains_matches = self.books_data[
+                    self.books_data['title'].str.lower().str.contains(book_title.lower(), regex=False, na=False)
+                ]
+                if not contains_matches.empty:
+                    book_idx = contains_matches.index[0]
+                else:
+                    # 3) Fuzzy match – pick highest similarity title
+                    from difflib import SequenceMatcher
+                    titles_lower = self.books_data['title'].str.lower().tolist()
+                    ratios = [SequenceMatcher(None, t, book_title.lower()).ratio() for t in titles_lower]
+                    best_idx = int(np.argmax(ratios))
+                    if ratios[best_idx] < 0.4:  # arbitrary threshold; no good match
+                        return [{"error": f"Book '{book_title}' not found"}]
+                    book_idx = best_idx
             
-            if book_matches.empty:
-                return [{"error": f"Book '{book_title}' not found"}]
-            
-            # Use the first match
-            book_idx = book_matches.index[0]
             book_features = self.features_matrix[book_idx].reshape(1, -1)
             
             print(f"Found book: {self.books_data.iloc[book_idx]['title']}")
