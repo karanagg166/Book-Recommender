@@ -5,6 +5,7 @@ import GenreExplorer from "../components/GenreExplorer";
 import BookSearch from "../components/BookSearch";
 import PopularBooks from "../components/PopularBooks";
 import Analytics from "../components/Analytics";
+import PreferenceWizard from "../components/PreferenceWizard";
 
 export default function Home() {
   const [currentPage, setCurrentPage] = useState('home');
@@ -21,6 +22,8 @@ export default function Home() {
         return <PopularBooks />;
       case 'analytics':
         return <Analytics />;
+      case 'preferences':
+        return <PreferenceWizard />;
       default:
         return <HomePage onPageChange={setCurrentPage} />;
     }

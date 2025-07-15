@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, Search, TrendingUp, BarChart3, Compass, Home } from 'lucide-react';
+import { BookOpen, Search, TrendingUp, BarChart3, Compass, Home, Sliders } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface LayoutProps {
@@ -17,6 +17,7 @@ export default function Layout({ children, currentPage, onPageChange }: LayoutPr
     { id: 'search', label: 'Book Search', icon: Search },
     { id: 'popular', label: 'Popular Books', icon: TrendingUp },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'preferences', label: 'Preferences', icon: Sliders },
   ];
 
   return (

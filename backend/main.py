@@ -4,6 +4,8 @@ import uvicorn
 
 # Import our modular recommendation system
 from genre_recommender import recommend_books, get_recommender
+from pydantic import BaseModel
+
 
 app = FastAPI(
     title="Book Recommender API",
@@ -221,6 +223,41 @@ def get_analytics():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error computing analytics: {str(e)}")
+
+
+class PreferenceRequest(BaseModel):
+    high_rating: bool | None = None  # Prefer books rated 4.0+
+    popular: bool | None = None      # Prefer books with many ratings
+    language: str | None = None      # ISO language code preference
+    sentiment_positive: bool | None = None  # Prefer books with positive sentiment
+
+
+@app.post("/recommend/preferences")
+def recommend_by_preferences(pref: PreferenceRequest):
+    """Return book recommendations tailored to user preference flags."""
+    try:
+        recommender = get_recommender()
+        prefs_dict = {k: v for k, v in pref.dict().items() if v is not None}
+        import numpy as np
+        raw_recs = recommender.engine.get_books_similar_to_preferences(prefs_dict, n_recommendations=10)
+
+        # Convert numpy types to native Python types for JSON serialization
+        def _to_native(val):
+            if isinstance(val, (np.integer,)):
+                return int(val)
+            if isinstance(val, (np.floating,)):
+                return float(val)
+            return val
+
+        recs = [{k: _to_native(v) for k, v in rec.items()} for rec in raw_recs]
+
+        return {
+            "preferences": prefs_dict,
+            "recommendations": recs,
+            "count": len(recs),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating preference-based recommendations: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
