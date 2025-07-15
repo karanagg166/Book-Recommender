@@ -259,5 +259,26 @@ def recommend_by_preferences(pref: PreferenceRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating preference-based recommendations: {str(e)}")
 
+@app.get("/sentiment")
+def sentiment_score(text: str = Query(..., description="Text to evaluate sentiment for")):
+    """Return sentiment classification and score for a piece of text (0-1 positive)."""
+    try:
+        recommender = get_recommender()
+        analyzer = recommender.engine.sentiment_analyzer
+        if analyzer is None:
+            from sentiment_analysis import SentimentAnalyzer
+            analyzer = SentimentAnalyzer()
+            analyzer.load_model()
+        sentiment, confidence = analyzer.predict_sentiment(text)
+        score = analyzer.get_sentiment_score(text)
+        return {
+            "text": text,
+            "sentiment": sentiment,
+            "confidence": round(float(confidence), 3),
+            "score": round(float(score), 3)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error computing sentiment: {str(e)}")
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

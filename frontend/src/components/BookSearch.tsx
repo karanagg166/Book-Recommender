@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, BookOpen, Star, Users, Heart, Sparkles } from 'lucide-react';
+import { Search, BookOpen, Star, Users, Heart, Sparkles, Smile, Frown } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 // Centralised API base; falls back to localhost during dev
@@ -33,6 +33,11 @@ export default function BookSearch() {
   const [similarBooksLoading, setSimilarBooksLoading] = useState(false);
   const [selectedBookTitle, setSelectedBookTitle] = useState<string>('');
   const [showSimilarBooks, setShowSimilarBooks] = useState(false);
+
+  // Sentiment state
+  const [reviewText, setReviewText] = useState('');
+  const [analyzing, setAnalyzing] = useState(false);
+  const [sentimentResult, setSentimentResult] = useState<{ sentiment: string; score: number; confidence: number } | null>(null);
 
   // Debounce search query
   useEffect(() => {
@@ -150,6 +155,30 @@ export default function BookSearch() {
     'The Alchemist',
     'To Kill a Mockingbird'
   ];
+
+  // Sentiment fetcher
+  const analyzeSentiment = async () => {
+    if (!reviewText.trim()) {
+      toast.error('Please enter some text first');
+      return;
+    }
+    setAnalyzing(true);
+    setSentimentResult(null);
+    try {
+      const res = await fetch(`${API_BASE}/sentiment?text=${encodeURIComponent(reviewText)}`);
+      const data = await res.json();
+      if (res.ok) {
+        setSentimentResult({ sentiment: data.sentiment, score: data.score, confidence: data.confidence });
+      } else {
+        throw new Error(data.detail || 'Error');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to analyze sentiment');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -453,6 +482,45 @@ export default function BookSearch() {
           </div>
         </motion.div>
       )}
+
+      {/* Sentiment Analyzer */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg border border-gray-200 dark:border-gray-700 space-y-6"
+      >
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+          <Sparkles className="w-6 h-6 text-blue-500" /> Sentiment Analyzer
+        </h2>
+        <textarea
+          rows={3}
+          value={reviewText}
+          onChange={(e) => setReviewText(e.target.value)}
+          placeholder="Paste a review or any text to see its sentiment..."
+          className="w-full p-4 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+        <div className="flex items-center gap-4">
+          <button
+            onClick={analyzeSentiment}
+            disabled={analyzing}
+            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all disabled:opacity-50"
+          >
+            Analyze
+          </button>
+          {sentimentResult && (
+            <div className="flex items-center gap-2 text-lg font-medium">
+              {sentimentResult.sentiment === 'positive' ? (
+                <Smile className="w-6 h-6 text-green-500" />
+              ) : (
+                <Frown className="w-6 h-6 text-red-500" />
+              )}
+              <span className="text-gray-800 dark:text-gray-200 capitalize">{sentimentResult.sentiment}</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">({Math.round(sentimentResult.score * 100)}% positive)</span>
+            </div>
+          )}
+        </div>
+      </motion.div>
     </div>
   );
 } 

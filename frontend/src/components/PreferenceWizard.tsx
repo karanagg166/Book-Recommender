@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles, Sliders, Heart, Users, Star } from 'lucide-react';
+import { Sliders, Heart, Users, Star } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
@@ -37,7 +37,7 @@ export default function PreferenceWizard() {
       try {
         const res = await fetch(`${API_BASE}/analytics`);
         const data = await res.json();
-        const langs = (data.top_languages || []).map((l: any) => l.language);
+        const langs = (data.top_languages || []).map((l: { language: string }) => l.language);
         if (langs.length) setLanguages(langs);
       } catch {
         // Ignore
@@ -50,7 +50,7 @@ export default function PreferenceWizard() {
     setLoading(true);
     setResults([]);
     try {
-      const body: any = {};
+      const body: { [key: string]: boolean | string } = {};
       Object.entries(prefs).forEach(([k, v]) => {
         if (v !== null && v !== undefined) body[k] = v;
       });
