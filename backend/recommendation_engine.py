@@ -1,8 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
-from sklearn.metrics.pairwise import cosine_similarity
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Optional
 import joblib
 import os
 
