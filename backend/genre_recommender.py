@@ -218,11 +218,11 @@ class GenreBasedRecommender:
         genre_books = self._find_books_by_genre(genre)
         
         return {
-            'genre': genre,
-            'total_books': len(genre_books),
-            'avg_rating': genre_books['average_rating'].mean() if not genre_books.empty else 0,
+            'genre': str(genre),
+            'total_books': int(len(genre_books)),
+            'avg_rating': float(genre_books['average_rating'].mean()) if not genre_books.empty else 0.0,
             'keywords': self.genre_keywords.get(genre.lower(), []),
-            'sample_books': genre_books['title'].head(5).tolist() if not genre_books.empty else []
+            'sample_books': [str(title) for title in genre_books['title'].head(5).tolist()] if not genre_books.empty else []
         }
     
     def search_books(self, query: str, n_results: int = 10) -> List[Dict]:
@@ -242,10 +242,10 @@ class GenreBasedRecommender:
         results = []
         for _, book in matches.head(n_results).iterrows():
             results.append({
-                'title': book['title'],
-                'author': book['primary_author'],
-                'rating': book['average_rating'],
-                'ratings_count': book['ratings_count']
+                'title': str(book['title']),
+                'author': str(book['primary_author']),
+                'rating': float(book['average_rating']),
+                'ratings_count': int(book['ratings_count'])
             })
         
         return results

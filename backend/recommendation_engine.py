@@ -195,16 +195,74 @@ class BookRecommendationEngine:
         self.books_data = self.data_loader.load_data()
         self.books_data = self.data_loader.preprocess_data()
         
-        # Create simple features
-        simple_features = self.books_data[['average_rating', 'ratings_count']].fillna(0)
-        self.features_matrix = self.feature_engineer.scaler.fit_transform(simple_features)
-        self.feature_names = ['average_rating', 'ratings_count']
+        # Create better features for similarity
+        # Use multiple features that can indicate book similarity
+        features_list = []
+        feature_names = []
         
-        # Train simple KNN model
-        self.knn_model = NearestNeighbors(n_neighbors=6, algorithm='ball_tree', metric='euclidean')
+        # Rating features
+        self.books_data['rating_normalized'] = self.books_data['average_rating'] / 5.0
+        features_list.append(self.books_data['rating_normalized'].fillna(0))
+        feature_names.append('rating_normalized')
+        
+        # Popularity feature (log-scaled)
+        self.books_data['popularity'] = np.log1p(self.books_data['ratings_count']).fillna(0)
+        max_popularity = self.books_data['popularity'].max()
+        if max_popularity > 0:
+            self.books_data['popularity_normalized'] = self.books_data['popularity'] / max_popularity
+        else:
+            self.books_data['popularity_normalized'] = 0
+        features_list.append(self.books_data['popularity_normalized'])
+        feature_names.append('popularity_normalized')
+        
+        # Language features (one-hot encoding for top languages)
+        top_languages = self.books_data['language_code'].value_counts().head(5).index
+        for lang in top_languages:
+            lang_feature = (self.books_data['language_code'] == lang).astype(float)
+            features_list.append(lang_feature)
+            feature_names.append(f'lang_{lang}')
+        
+        # Publication year features (normalized)
+        if 'publication_year' in self.books_data.columns:
+            min_year = self.books_data['publication_year'].min()
+            max_year = self.books_data['publication_year'].max()
+            if max_year > min_year:
+                year_normalized = (self.books_data['publication_year'] - min_year) / (max_year - min_year)
+            else:
+                year_normalized = pd.Series(0, index=self.books_data.index)
+            features_list.append(year_normalized.fillna(0.5))
+            feature_names.append('year_normalized')
+        
+        # Author frequency (books by same author are more similar)
+        author_counts = self.books_data['primary_author'].value_counts()
+        author_popularity = self.books_data['primary_author'].map(author_counts).fillna(1)
+        author_normalized = np.log1p(author_popularity) / np.log1p(author_counts.max()) if author_counts.max() > 0 else pd.Series(0, index=self.books_data.index)
+        features_list.append(author_normalized)
+        feature_names.append('author_popularity')
+        
+        # Combine all features
+        import pandas as pd
+        features_df = pd.concat(features_list, axis=1)
+        features_df.columns = feature_names
+        
+        # Fill any remaining NaN values
+        features_df = features_df.fillna(0)
+        
+        print(f"Created {len(feature_names)} features: {feature_names}")
+        
+        # Store features
+        self.features_matrix = features_df.values
+        self.feature_names = feature_names
+        
+        # Train KNN model with cosine similarity for better content matching
+        self.knn_model = NearestNeighbors(
+            n_neighbors=min(6, len(self.books_data)), 
+            algorithm='brute',  # Use brute force for cosine with small datasets
+            metric='cosine'
+        )
         self.knn_model.fit(self.features_matrix)
         
-        print("Basic model initialized successfully!")
+        print("Basic model initialized successfully with improved features!")
     
     def get_book_recommendations_by_title(self, book_title: str, 
                                         n_recommendations: int = 5) -> List[Dict]:
@@ -227,10 +285,15 @@ class BookRecommendationEngine:
             book_idx = book_matches.index[0]
             book_features = self.features_matrix[book_idx].reshape(1, -1)
             
+            print(f"Found book: {self.books_data.iloc[book_idx]['title']}")
+            # Debug: print(f"Using {self.knn_model.metric} distance metric")
+            
             # Get similar books
             distances, indices = self.knn_model.kneighbors(
                 book_features, n_neighbors=min(n_recommendations + 1, len(self.books_data))
             )
+            
+            # Debug: print(f"Raw distances: {distances[0]}")
             
             recommendations = []
             for i, (dist, idx) in enumerate(zip(distances[0], indices[0])):
@@ -238,19 +301,30 @@ class BookRecommendationEngine:
                     continue
                     
                 book = self.books_data.iloc[idx]
-                similarity = 1 - dist  # Convert distance to similarity
+                
+                # Calculate similarity based on the distance metric
+                if self.knn_model.metric == 'cosine':
+                    # Cosine distance is in [0, 2], convert to similarity [0, 1]
+                    similarity = max(0, (2 - dist) / 2)
+                elif self.knn_model.metric == 'euclidean':
+                    # For euclidean, convert using exponential decay for better interpretation
+                    similarity = max(0, 1 / (1 + dist))
+                else:
+                    # General case: assume distance is in [0, 1] or normalize
+                    similarity = max(0, 1 - min(dist, 1))
                 
                 recommendations.append({
-                    'title': book['title'],
-                    'author': book.get('primary_author', book.get('authors', 'Unknown')),
-                    'rating': book['average_rating'],
-                    'similarity': round(similarity, 3),
-                    'ratings_count': book['ratings_count']
+                    'title': str(book['title']),
+                    'author': str(book.get('primary_author', book.get('authors', 'Unknown'))),
+                    'rating': float(book['average_rating']),
+                    'similarity': round(float(similarity), 3),
+                    'ratings_count': int(book['ratings_count'])
                 })
                 
                 if len(recommendations) >= n_recommendations:
                     break
             
+            # Debug: print(f"Returning {len(recommendations)} recommendations")
             return recommendations
         except Exception as e:
             print(f"Error getting book recommendations: {e}")
@@ -322,11 +396,11 @@ class BookRecommendationEngine:
         recommendations = []
         for _, book in popular_books.iterrows():
             recommendations.append({
-                'title': book['title'],
-                'author': book['primary_author'],
-                'rating': book['average_rating'],
-                'ratings_count': book['ratings_count'],
-                'language': book['language_code']
+                'title': str(book['title']),
+                'author': str(book['primary_author']),
+                'rating': float(book['average_rating']),
+                'ratings_count': int(book['ratings_count']),
+                'language': str(book['language_code'])
             })
         
         return recommendations

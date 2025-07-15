@@ -28,7 +28,8 @@ def root():
         "endpoints": {
             "/recommend": "Get book recommendations by genre",
             "/genres": "List available genres",
-            "/search": "Search for books by title or author"
+            "/search": "Search for books by title or author",
+            "/books/similar": "Get similar books based on a book title"
         }
     }
 
@@ -81,6 +82,22 @@ def search_books(q: str = Query(..., description="Search query for books")):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error searching books: {str(e)}")
+
+@app.get("/books/similar")
+def get_similar_books(title: str = Query(..., description="Book title to find similar books for"),
+                     limit: int = Query(5, description="Number of similar books to return")):
+    """Get books similar to a given book title."""
+    try:
+        recommender = get_recommender()
+        # Access the recommendation engine directly for book-to-book recommendations
+        similar_books = recommender.engine.get_book_recommendations_by_title(title, limit)
+        return {
+            "query_book": title,
+            "similar_books": similar_books,
+            "count": len(similar_books)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error finding similar books: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

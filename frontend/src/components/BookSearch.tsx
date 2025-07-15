@@ -1,81 +1,118 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Search, Star, Users, BookOpen, X } from 'lucide-react';
-import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, BookOpen, Star, Users, Heart, Sparkles } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 
-interface BookResult {
+interface Book {
   title: string;
   author: string;
-  rating: number;
-  ratings_count: number;
+  rating?: number;
+  ratings_count?: number;
+}
+
+interface SimilarBook {
+  title: string;
+  author: string;
+  rating?: number;
+  similarity?: number;
+  ratings_count?: number;
 }
 
 export default function BookSearch() {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<BookResult[]>([]);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [results, setResults] = useState<Book[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   
-  // Debounced search
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-  
+  // Similar books state
+  const [similarBooks, setSimilarBooks] = useState<SimilarBook[]>([]);
+  const [similarBooksLoading, setSimilarBooksLoading] = useState(false);
+  const [selectedBookTitle, setSelectedBookTitle] = useState<string>('');
+  const [showSimilarBooks, setShowSimilarBooks] = useState(false);
+
+  // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(query);
     }, 300);
-    
+
     return () => clearTimeout(timer);
   }, [query]);
-  
+
+  // Fetch search results
   useEffect(() => {
-    if (debouncedQuery.trim().length >= 2) {
-      performSearch(debouncedQuery);
+    if (debouncedQuery.trim()) {
+      fetchBooks();
     } else {
       setResults([]);
       setHasSearched(false);
     }
   }, [debouncedQuery]);
 
-  const performSearch = async (searchQuery: string) => {
+  const fetchBooks = async () => {
     setLoading(true);
     setHasSearched(true);
-    
     try {
-      const res = await fetch(`http://localhost:8000/search?q=${encodeURIComponent(searchQuery)}`);
+      const res = await fetch(`http://localhost:8000/search?q=${encodeURIComponent(debouncedQuery)}`);
       const data = await res.json();
       setResults(data.books || []);
     } catch (error) {
-      console.error('Error searching books:', error);
-      toast.error('Failed to search books');
+      console.error('Error fetching books:', error);
+      toast.error('Failed to search books. Please try again.');
       setResults([]);
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
   };
 
-  const clearSearch = () => {
-    setQuery('');
-    setResults([]);
-    setHasSearched(false);
+  const fetchSimilarBooks = async (bookTitle: string) => {
+    setSimilarBooksLoading(true);
+    setSelectedBookTitle(bookTitle);
+    setShowSimilarBooks(true);
+    try {
+      const res = await fetch(`http://localhost:8000/books/similar?title=${encodeURIComponent(bookTitle)}&limit=6`);
+      const data = await res.json();
+      setSimilarBooks(data.similar_books || []);
+      if (data.similar_books && data.similar_books.length > 0) {
+        toast.success(`Found ${data.similar_books.length} similar books!`);
+      } else {
+        toast.success('No similar books found for this title.');
+      }
+    } catch (error) {
+      console.error('Error fetching similar books:', error);
+      toast.error('Failed to find similar books. Please try again.');
+      setSimilarBooks([]);
+    } finally {
+      setSimilarBooksLoading(false);
+    }
+  };
+
+  const closeSimilarBooks = () => {
+    setShowSimilarBooks(false);
+    setSimilarBooks([]);
+    setSelectedBookTitle('');
   };
 
   const getStarRating = (rating: number) => {
     const stars = [];
     const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
+    const hasHalfStar = rating % 1 !== 0;
     
+    // Full stars
     for (let i = 0; i < fullStars; i++) {
       stars.push(
-        <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+        <Star key={`full-${i}`} className="w-4 h-4 text-yellow-400 fill-current" />
       );
     }
     
+    // Half star
     if (hasHalfStar) {
       stars.push(
-        <div key="half" className="relative w-4 h-4">
-          <Star className="w-4 h-4 text-gray-300 absolute" />
-          <div className="overflow-hidden w-2">
-            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400 absolute" />
+        <div key="half" className="relative">
+          <Star className="w-4 h-4 text-gray-300" />
+          <div className="absolute inset-0 overflow-hidden w-1/2">
+            <Star className="w-4 h-4 text-yellow-400 fill-current" />
           </div>
         </div>
       );
@@ -119,11 +156,11 @@ export default function BookSearch() {
         animate={{ opacity: 1, y: 0 }}
         className="text-center"
       >
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent mb-4">
-          Smart Book Search
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
+          Book Search
         </h1>
-        <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-          Search through our vast collection of over 11,000 books. Find your next great read by title, author, or keywords.
+        <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+          Discover your next favorite book by searching through our extensive collection of literature.
         </p>
       </motion.div>
 
@@ -131,72 +168,131 @@ export default function BookSearch() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="max-w-3xl mx-auto"
+        transition={{ delay: 0.1 }}
+        className="max-w-2xl mx-auto"
       >
         <div className="relative">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search for books, authors, or keywords..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-full pl-12 pr-12 py-4 text-lg border border-gray-300 dark:border-gray-600 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 shadow-lg"
-            />
-            {query && (
-              <button
-                onClick={clearSearch}
-                className="absolute right-4 top-1/2 transform -translate-y-1/2 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            )}
-          </div>
-          
-          {/* Search Stats */}
-          {hasSearched && (
-            <div className="flex items-center justify-between mt-3 text-sm text-gray-600 dark:text-gray-400">
-              <span>
-                {loading ? 'Searching...' : `${results.length} results found`}
-              </span>
-              {debouncedQuery && (
-                <span>for &quot;{debouncedQuery}&quot;</span>
-              )}
-            </div>
-          )}
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search for books by title or author..."
+            className="w-full pl-12 pr-4 py-4 text-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-gray-700 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all shadow-lg"
+          />
         </div>
       </motion.div>
 
-      {/* Search Suggestions */}
-      {!hasSearched && !query && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="text-center"
-        >
-          <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-200">
-            Popular Searches
-          </h3>
-          <div className="flex flex-wrap justify-center gap-3">
-            {searchSuggestions.map((suggestion, i) => (
-              <motion.button
-                key={suggestion}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.4 + i * 0.05 }}
-                onClick={() => setQuery(suggestion)}
-                className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-gray-700 rounded-full hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-gray-700 dark:text-gray-300"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                {suggestion}
-              </motion.button>
-            ))}
-          </div>
-        </motion.div>
-      )}
+      {/* Similar Books Modal */}
+      <AnimatePresence>
+        {showSimilarBooks && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={closeSimilarBooks}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-slate-800 rounded-2xl p-6 max-w-4xl max-h-[80vh] overflow-y-auto shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-2">
+                    Books Similar to &quot;{selectedBookTitle}&quot;
+                  </h2>
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                    <Sparkles className="w-4 h-4" />
+                    <span>Based on content similarity and user preferences</span>
+                  </div>
+                </div>
+                <button
+                  onClick={closeSimilarBooks}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              {similarBooksLoading ? (
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="flex items-start space-x-4 p-4 bg-gray-100 dark:bg-slate-700 rounded-xl">
+                        <div className="w-12 h-16 bg-gray-200 dark:bg-gray-600 rounded"></div>
+                        <div className="flex-1 space-y-2">
+                          <div className="h-5 bg-gray-200 dark:bg-gray-600 rounded w-3/4"></div>
+                          <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-1/2"></div>
+                          <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-1/4"></div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {similarBooks.length > 0 ? (
+                    similarBooks.map((book, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="flex items-start space-x-4 p-4 bg-gray-50 dark:bg-slate-700 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"
+                      >
+                        <div className="w-12 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <BookOpen className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-gray-800 dark:text-gray-200 mb-1 line-clamp-1">
+                            {book.title}
+                          </h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                            by {book.author}
+                          </p>
+                          <div className="flex items-center gap-4 text-xs">
+                            <div className="flex items-center gap-1">
+                              {getStarRating(book.rating || 0)}
+                              <span className="text-gray-700 dark:text-gray-300 ml-1">
+                                {(book.rating || 0).toFixed(1)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                              <Users className="w-3 h-3" />
+                              <span>{formatNumber(book.ratings_count || 0)}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                              <Heart className="w-3 h-3" />
+                              <span>{Math.round((book.similarity || 0) * 100)}% match</span>
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => fetchSimilarBooks(book.title)}
+                          className="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                        >
+                          More Like This
+                        </button>
+                      </motion.div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600 dark:text-gray-400">
+                        No similar books found for this title.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Loading State */}
       {loading && (
@@ -259,28 +355,35 @@ export default function BookSearch() {
                       {/* Rating */}
                       <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1">
-                          {getStarRating(book.rating)}
+                          {getStarRating(book.rating || 0)}
                         </div>
                         <span className="font-medium text-gray-700 dark:text-gray-300">
-                          {book.rating.toFixed(1)}
+                          {(book.rating || 0).toFixed(1)}
                         </span>
                       </div>
                       
                       {/* Ratings Count */}
                       <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
                         <Users className="w-4 h-4" />
-                        <span>{formatNumber(book.ratings_count)} ratings</span>
+                        <span>{formatNumber(book.ratings_count || 0)} ratings</span>
                       </div>
                     </div>
                   </div>
                   
-                  {/* Action Button */}
-                  <div className="flex-shrink-0">
+                  {/* Action Buttons */}
+                  <div className="flex-shrink-0 flex gap-2">
                     <button
                       className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium"
-                      onClick={() => toast.info('Book details feature coming soon!')}
+                      onClick={() => toast.success('Book details feature coming soon!')}
                     >
                       View Details
+                    </button>
+                    <button
+                      className="px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors font-medium flex items-center gap-2"
+                      onClick={() => fetchSimilarBooks(book.title)}
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      More Like This
                     </button>
                   </div>
                 </div>
@@ -320,37 +423,30 @@ export default function BookSearch() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+          transition={{ delay: 0.2 }}
+          className="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-lg border border-gray-200 dark:border-gray-700"
         >
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
-            <Search className="w-8 h-8 text-blue-500 mb-3" />
-            <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">
-              Smart Search
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 text-sm">
-              Search by book titles, author names, or keywords. Our system will find the most relevant matches.
-            </p>
-          </div>
-          
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
-            <BookOpen className="w-8 h-8 text-green-500 mb-3" />
-            <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">
-              Instant Results
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 text-sm">
-              Get real-time search results as you type. No need to press enter - just start typing!
-            </p>
-          </div>
-          
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
-            <Star className="w-8 h-8 text-yellow-500 mb-3" />
-            <h3 className="text-lg font-semibold mb-2 text-gray-800 dark:text-gray-200">
-              Detailed Info
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 text-sm">
-              See ratings, review counts, and author information to help you choose your next read.
-            </p>
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-4">
+            Popular Searches
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            Get started with these popular book searches:
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {searchSuggestions.map((suggestion, i) => (
+              <motion.button
+                key={suggestion}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 + i * 0.05 }}
+                onClick={() => setQuery(suggestion)}
+                className="p-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 hover:from-blue-100 hover:to-purple-100 dark:hover:from-blue-800/40 dark:hover:to-purple-800/40 rounded-xl border border-blue-200 dark:border-blue-700 text-blue-700 dark:text-blue-300 font-medium transition-all text-sm hover:shadow-md"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                {suggestion}
+              </motion.button>
+            ))}
           </div>
         </motion.div>
       )}
