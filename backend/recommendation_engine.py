@@ -278,7 +278,7 @@ class BookRecommendationEngine:
         except Exception as e:
             print(f"⚠️  Warning: Could not save basic model: {e}")
     
-    def get_book_recommendations_by_title(self, book_title: str, 
+    def ˀget_book_recommendations_by_title(self, book_title: str, 
                                         n_recommendations: int = 5) -> List[Dict]:
         """Get recommendations based on a specific book title."""
         try:

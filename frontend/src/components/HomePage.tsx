@@ -3,6 +3,9 @@ import { motion } from 'framer-motion';
 import { Sparkles, Search, TrendingUp, Compass, BarChart3, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 
+// Centralised API base; falls back to localhost during dev
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+
 interface HomePageProps {
   onPageChange: (page: string) => void;
 }
@@ -30,7 +33,7 @@ export default function HomePage({ onPageChange }: HomePageProps) {
 
   const fetchGenres = async () => {
     try {
-      const res = await fetch('http://localhost:8000/genres');
+      const res = await fetch(`${API_BASE}/genres`);
       const data = await res.json();
       setGenres(data.genres || []);
     } catch (error) {
@@ -42,7 +45,7 @@ export default function HomePage({ onPageChange }: HomePageProps) {
     try {
       const featuredList = ['fantasy', 'romance', 'mystery', 'science_fiction'];
       const promises = featuredList.map(async (genre) => {
-        const res = await fetch(`http://localhost:8000/genre/${genre}/info`);
+        const res = await fetch(`${API_BASE}/genre/${genre}/info`);
         return await res.json();
       });
       const results = await Promise.all(promises);
@@ -59,7 +62,7 @@ export default function HomePage({ onPageChange }: HomePageProps) {
     }
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/recommend?genre=${quickGenre}`);
+      const res = await fetch(`${API_BASE}/recommend?genre=${quickGenre}`);
       const data = await res.json();
       setQuickBooks(data.recommendations || []);
     } catch (error) {
