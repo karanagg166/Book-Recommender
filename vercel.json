@@ -5,17 +5,18 @@
   "installCommand": "echo 'Dependencies will be installed during build'",
   "functions": {
     "backend/api/index.py": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "runtime": "python3.9"
     }
   },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "/backend/api/index.py"
+      "src": "/api/(.*)",
+      "dest": "/backend/api/index.py"
     },
     {
-      "source": "/(.*)",
-      "destination": "/frontend/$1"
+      "src": "/(.*)",
+      "dest": "/frontend/$1"
     }
   ]
 } 

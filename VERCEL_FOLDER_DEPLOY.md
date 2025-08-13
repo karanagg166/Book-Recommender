@@ -61,6 +61,38 @@ Click **Redeploy** to apply environment variables.
 - **Dependencies**: All npm packages will be installed during build
 - **Python**: Vercel will handle Python runtime automatically
 
+## 🚨 **Troubleshooting Backend Issues**
+
+### **If Backend is Not Working:**
+
+1. **Check Vercel Function Logs:**
+   - Go to your project dashboard
+   - Click on "Functions" tab
+   - Look for `backend/api/index.py` function
+   - Check for any error logs
+
+2. **Verify Python Runtime:**
+   - Ensure `requirements.txt` is in the backend folder
+   - Check that all Python dependencies are listed
+
+3. **Test API Endpoints:**
+   - Try accessing: `https://your-project.vercel.app/api/`
+   - Should return API information
+   - Try: `https://your-project.vercel.app/api/genres`
+
+4. **Common Issues:**
+   - **Import Errors**: Check if all Python files are uploaded
+   - **Data File Missing**: Ensure `books.csv` is in the backend folder
+   - **Dependencies**: Verify all packages in `requirements.txt`
+
+### **Local Testing:**
+Before deploying, test locally:
+```bash
+cd backend
+python -m uvicorn api.index:app --reload
+```
+Then run: `python ../test-backend.py`
+
 ## 🎉 **You're Ready!**
 
 Your entire project folder is now configured for Vercel deployment. Just upload the folder and Vercel will handle the rest! 
