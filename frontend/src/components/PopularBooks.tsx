@@ -40,7 +40,7 @@ export default function PopularBooks() {
         const data = await res.json();
 
         // Normalise keys for UI
-        const hydrated: Book[] = (data.books || []).map((b: any) => ({
+        const hydrated: Book[] = (data.books || []).map((b: Record<string, unknown>) => ({
           title: b.title,
           author: b.author,
           rating: b.rating,

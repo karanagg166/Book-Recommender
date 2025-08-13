@@ -20,7 +20,6 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
 
 export default function Analytics() {
   const [data, setData] = useState<AnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState<'overview' | 'genres' | 'languages' | 'ratings'>('overview');
 
   // Fetch analytics on mount
@@ -34,8 +33,6 @@ export default function Analytics() {
       } catch (err) {
         console.error('Failed loading analytics', err);
         toast.error('Failed to load analytics');
-      } finally {
-        setLoading(false);
       }
     };
     fetchAnalytics();

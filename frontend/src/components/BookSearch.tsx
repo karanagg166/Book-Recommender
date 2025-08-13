@@ -48,16 +48,6 @@ export default function BookSearch() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  // Fetch search results
-  useEffect(() => {
-    if (debouncedQuery.trim()) {
-      fetchBooks();
-    } else {
-      setResults([]);
-      setHasSearched(false);
-    }
-  }, [debouncedQuery]);
-
   const fetchBooks = async () => {
     setLoading(true);
     setHasSearched(true);
@@ -73,6 +63,16 @@ export default function BookSearch() {
       setLoading(false);
     }
   };
+
+  // Fetch search results
+  useEffect(() => {
+    if (debouncedQuery.trim()) {
+      fetchBooks();
+    } else {
+      setResults([]);
+      setHasSearched(false);
+    }
+  }, [debouncedQuery]);
 
   const fetchSimilarBooks = async (bookTitle: string) => {
     setSimilarBooksLoading(true);

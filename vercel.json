@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "buildCommand": "./build.sh",
+  "outputDirectory": "frontend/.next",
+  "installCommand": "echo 'Dependencies will be installed during build'",
+  "functions": {
+    "backend/api/index.py": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/backend/api/index.py"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/frontend/$1"
+    }
+  ]
+} 
