@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart3, BookOpen, Users, Star, TrendingUp, Globe, Award } from 'lucide-react';
 import { toast } from 'sonner';
+import { API_BASE } from '../utils/api';
 
 /**
  * Data shape returned by /analytics endpoint.
@@ -15,8 +16,6 @@ interface AnalyticsData {
   top_languages: { language: string; count: number; percentage: number }[];
   rating_distribution: { range: string; count: number; percentage: number }[];
 }
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
 
 export default function Analytics() {
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -222,7 +221,7 @@ export default function Analytics() {
                   Quality Collection
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {analytics.rating_distribution.length >= 2 ? ((analytics.rating_distribution[4]?.count ?? 0 + analytics.rating_distribution[3]?.count ?? 0) / (analytics.total_books || 1) * 100).toFixed(1) : '0.0'}% 
+                  {analytics.rating_distribution.length >= 2 ? (((analytics.rating_distribution[4]?.count ?? 0) + (analytics.rating_distribution[3]?.count ?? 0)) / (analytics.total_books || 1) * 100).toFixed(1) : '0.0'}% 
                   of books rated 4.0+ stars
                 </p>
               </div>
@@ -297,7 +296,7 @@ export default function Analytics() {
           <Star className="w-8 h-8 mb-4" />
           <h3 className="text-xl font-bold mb-2">Quality Rating</h3>
           <p className="text-lg">
-            {analytics.rating_distribution.length >= 2 ? ((analytics.rating_distribution[4]?.count ?? 0 + analytics.rating_distribution[3]?.count ?? 0) / (analytics.total_books || 1) * 100).toFixed(1) : '0.0'}% 
+            {analytics.rating_distribution.length >= 2 ? (((analytics.rating_distribution[4]?.count ?? 0) + (analytics.rating_distribution[3]?.count ?? 0)) / (analytics.total_books || 1) * 100).toFixed(1) : '0.0'}% 
             <span className="text-sm opacity-90 ml-2">
               books rated 4.0+ stars
             </span>

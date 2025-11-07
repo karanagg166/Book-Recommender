@@ -2,6 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from mangum import Mangum
+import sys
+import os
+
+# Add the parent directory to Python path to find our modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import our modular recommendation system
 from genre_recommender import recommend_books, get_recommender

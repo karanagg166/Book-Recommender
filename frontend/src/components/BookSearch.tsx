@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, BookOpen, Star, Users, Heart, Sparkles, Smile, Frown } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-
-// Centralised API base; falls back to localhost during dev
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+import { API_BASE } from '../utils/api';
 
 interface Book {
   title: string;

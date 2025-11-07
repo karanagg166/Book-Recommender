@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp, Star, Users, Crown, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
+import { API_BASE } from '../utils/api';
 
 /**
  * Book object returned by /books/popular endpoint.
@@ -16,11 +17,6 @@ interface Book {
   language?: string; // used as a surrogate category filter
   year?: number;     // optional – not guaranteed by API
 }
-
-/**
- * API base is read from env to avoid hard-coding – falls back to localhost for dev.
- */
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
 
 export default function PopularBooks() {
   const [books, setBooks] = useState<Book[]>([]);

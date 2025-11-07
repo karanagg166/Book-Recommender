@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, Search, TrendingUp, Compass, BarChart3, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
-
-// Centralised API base; falls back to localhost during dev
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+import { API_BASE } from '../utils/api';
 
 interface HomePageProps {
   onPageChange: (page: string) => void;

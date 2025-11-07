@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Sliders, Heart, Users, Star } from 'lucide-react';
 import { toast } from 'sonner';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+import { API_BASE } from '../utils/api';
 
 interface Recommendation {
   title: string;
